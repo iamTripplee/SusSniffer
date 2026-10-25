@@ -1,42 +1,42 @@
 # SusSniffer
 
-Лёгкая программа для Windows, которая тихо сидит в трее, следит за запущенными процессами и простым языком объясняет, почему какой-то из них выглядит подозрительно.
+A lightweight Windows tray app that watches running processes and tells you, in plain words, why one of them looks suspicious.
 
-Сделана с расчётом на игроков: в фоне занимает около 5 МБ памяти и практически не трогает процессор.
+Built with gamers in mind: in the background it uses about 5 MB of RAM and next to no CPU.
 
-## Что ловит
+## What it flags
 
-| Признак | Баллы |
+| Signal | Points |
 |---|---|
-| Системное имя (`svchost.exe`, `lsass.exe`, `explorer.exe`…), но запуск не из системной папки | +40 |
-| Имя-двойник системного процесса (`scvhost.exe`, `expl0rer.exe`) | +35 |
-| Документ запускает командную оболочку (Word → PowerShell) | +30 |
-| Запуск из `Temp`, «Загрузок», корзины или общей папки | +20 |
-| Нет цифровой подписи (только вместе с другими признаками) | +15 |
+| System name (`svchost.exe`, `lsass.exe`, `explorer.exe`, …) running from outside its system folder | +40 |
+| Name one letter away from a system process (`scvhost.exe`, `expl0rer.exe`) | +35 |
+| Office or a PDF reader launching a shell (Word → PowerShell) | +30 |
+| Running from Temp, Downloads, the Recycle Bin or the Public folder | +20 |
+| No digital signature (only adds to other findings) | +15 |
 
-От 60 баллов — «Подозрительные», приходит уведомление. От 30 — «Стоит проверить».
+60+ is **Suspicious** and triggers a notification. 30+ is **Worth a look**.
 
-Для каждого процесса можно открыть разбор с причинами, завершить его, показать файл в папке, проверить хеш на VirusTotal или отметить «Это моё», чтобы больше не беспокоил.
+Each process opens a breakdown of what matched, with actions to end it, show it in Explorer, look its hash up on VirusTotal, or trust it so it stops coming up.
 
-## Почему лёгкая
+## Why it's light
 
-- Ядро (трей, наблюдение, уведомления) раз в 2 секунды берёт один снимок списка процессов и проверяет только новые.
-- Нагрузку по ЦП и памяти каждого процесса считает, только пока открыто окно.
-- Окно — отдельный процесс. При закрытии он завершается вместе со встроенным браузером, и память возвращается системе.
-- Во время полноэкранной игры уведомления копятся и показываются после.
+- The core lives in the tray, takes one process snapshot every 2 seconds and only analyses new processes.
+- Per-process CPU and memory are sampled only while the window is open.
+- The window is a separate process. Closing it exits that process along with WebView2, so the memory goes back to the system.
+- During fullscreen games notifications are held back until you're done.
 
-## Сборка
+## Building
 
-Нужны [Rust](https://rustup.rs), Node.js и Visual Studio Build Tools (C++).
+Requires [Rust](https://rustup.rs), Node.js and Visual Studio Build Tools (C++).
 
 ```bash
 npm install
 npm run build
 ```
 
-Установщик появится в `src-tauri/target/release/bundle/nsis/`.
+The installer ends up in `src-tauri/target/release/bundle/nsis/`.
 
-Тесты правил:
+Rule tests:
 
 ```bash
 cd src-tauri

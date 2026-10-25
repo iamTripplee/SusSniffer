@@ -1,7 +1,6 @@
-//! Фоновый наблюдатель за процессами.
-//!
-//! Раз в 2 секунды берёт один снимок списка процессов и проверяет только новые.
-//! Тяжёлое (ЦП и память каждого процесса) считается, лишь пока открыто окно.
+//! Background process watcher. Every tick it takes one process snapshot and
+//! only analyses processes it hasn't seen yet. Per-process CPU and memory are
+//! sampled only while the window is open.
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
@@ -44,8 +43,7 @@ pub struct Totals {
 pub struct Shared {
     pub procs: Mutex<HashMap<u32, Proc>>,
     pub trusted: Mutex<HashSet<String>>,
-    /// Когда окно последний раз запрашивало данные. Пока оно открыто,
-    /// считаем ЦП и память каждого процесса.
+    /// Last time the window polled us.
     pub ui_seen: Mutex<Option<Instant>>,
     pub self_usage: Mutex<(f32, u64)>,
     trusted_file: PathBuf,
@@ -67,7 +65,6 @@ impl Shared {
         })
     }
 
-    /// «Это моё»: запомнить путь и больше не считать его подозрительным.
     pub fn trust(&self, path: &str) {
         let mut t = self.trusted.lock().unwrap();
         t.insert(path.to_lowercase());
@@ -87,8 +84,7 @@ impl Shared {
     }
 }
 
-/// Запускает поток наблюдателя. `alert` вызывается с найденными угрозами,
-/// когда пользователь не в полноэкранной игре.
+/// `alert` gets newly found threats, but never while a fullscreen game is running.
 pub fn spawn(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>) + Send + 'static) {
     std::thread::Builder::new()
         .name("watcher".into())
@@ -113,7 +109,7 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
         {
             let procs = shared.procs.lock().unwrap();
             for r in &raw {
-                // 0 и 4 — служебные «процессы» ядра, у них нет файла.
+                // PIDs 0 and 4 are the idle and kernel pseudo-processes.
                 if r.pid <= 4 || procs.get(&r.pid).is_some_and(|p| p.name == r.name) {
                     continue;
                 }
@@ -121,7 +117,6 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
             }
         }
 
-        // Анализ новых процессов — без блокировки общего состояния.
         let analysed: Vec<Proc> = new_procs
             .into_iter()
             .map(|r| {
@@ -170,7 +165,6 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
                 procs.insert(p.pid, p);
             }
 
-            // ЦП и память по процессам — только когда на них кто-то смотрит.
             let elapsed = last_sample.elapsed().as_nanos() as u64 / 100;
             last_sample = Instant::now();
             let ui_open = shared.ui_seen.lock().unwrap().is_some_and(|t| t.elapsed() < Duration::from_secs(6));
@@ -195,7 +189,6 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
                 *shared.self_usage.lock().unwrap() = (cpu, mem);
             }
 
-            // Уведомления копим, пока идёт игра, и показываем после.
             if !pending.is_empty() && !win::user_is_busy() {
                 let found: Vec<Proc> = pending.drain(..).filter_map(|pid| procs.get(&pid).cloned()).collect();
                 if !found.is_empty() {
@@ -208,8 +201,8 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
     }
 }
 
-/// Подпись проверяем у всего, что лежит вне папки Windows: системные файлы
-/// подписаны через каталоги, и встроенной подписи у них может не быть.
+/// Windows binaries are catalog-signed and often have no embedded signature,
+/// so only files outside the Windows folder are checked.
 fn needs_signature_check(path: &str) -> bool {
     !path.to_lowercase().starts_with(r"c:\windows\")
 }

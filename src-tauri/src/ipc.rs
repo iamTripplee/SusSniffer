@@ -1,9 +1,5 @@
-//! Связь окна с ядром.
-//!
-//! Окно — отдельный процесс: так встроенный браузер полностью выгружается из
-//! памяти при закрытии. Ядро слушает 127.0.0.1 на случайном порту; каждое
-//! соединение — одна строка JSON-запроса и одна строка ответа. Запросы без
-//! правильного одноразового ключа отбрасываются.
+//! Window <-> core link. One JSON line per request and per reply over
+//! 127.0.0.1; requests without the session token are dropped.
 
 use std::hash::{BuildHasher, Hasher};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -34,7 +30,7 @@ pub fn random_token() -> String {
     out
 }
 
-/// Запускает сервер и возвращает выбранный порт.
+/// Starts the server and returns its port.
 pub fn serve(token: String, handler: Arc<Handler>) -> std::io::Result<u16> {
     let listener = TcpListener::bind("127.0.0.1:0")?;
     let port = listener.local_addr()?.port();
@@ -59,9 +55,8 @@ fn handle(stream: TcpStream, token: &str, handler: &Handler) -> std::io::Result<
     w.write_all(b"\n")
 }
 
-/// Клиентская сторона, для процесса окна.
 pub fn call(port: u16, token: &str, cmd: &str, pid: Option<u32>) -> Result<Value, String> {
-    let stream = TcpStream::connect(("127.0.0.1", port)).map_err(|e| format!("Ядро недоступно: {e}"))?;
+    let stream = TcpStream::connect(("127.0.0.1", port)).map_err(|e| format!("Core is not running: {e}"))?;
     stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
     let req = Request { token: token.into(), cmd: cmd.into(), pid };
     let mut w = &stream;

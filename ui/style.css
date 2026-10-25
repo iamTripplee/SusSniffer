@@ -1,4 +1,4 @@
-/* Три темы. Стекло — полупрозрачное окно поверх эффекта Mica от Windows. */
+/* glass sits on top of the Windows Mica backdrop */
 :root, [data-theme="glass"] {
   --win: rgba(28, 28, 32, 0.72);
   --hair: rgba(255, 255, 255, 0.14);
@@ -157,7 +157,7 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 4px; }
 .ok-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
 #self { margin-left: 8px; }
 
-/* Окно «почему подозрительно» */
+/* detail sheet */
 .detail { position: absolute; inset: 0; background: rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; padding: 16px; }
 .detail[hidden] { display: none; }
 .sheet { width: min(520px, 100%); max-height: 100%; overflow-y: auto; border-radius: 14px; background: var(--sheet); box-shadow: 0 0 0 0.5px var(--hair), 0 24px 60px rgba(0,0,0,.45); }

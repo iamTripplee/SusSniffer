@@ -1,6 +1,3 @@
-//! Эвристики: почему процесс выглядит подозрительно.
-//! Чистые функции без обращений к системе, чтобы их было легко тестировать.
-
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -23,17 +20,14 @@ impl Verdict {
     }
 }
 
-/// Что известно о процессе на момент проверки.
 pub struct ProcFacts<'a> {
     pub name: &'a str,
-    /// Полный путь к exe, если удалось прочитать (у защищённых процессов его нет).
     pub path: Option<&'a str>,
     pub parent_name: Option<&'a str>,
-    /// `Some(false)` — подписи нет или она недействительна; `None` — не проверяли.
+    /// `None` means the signature wasn't checked.
     pub signed: Option<bool>,
 }
 
-/// Системные процессы Windows и папки, из которых они обязаны запускаться.
 const SYSTEM_NAMES: &[(&str, &[&str])] = &[
     ("svchost.exe", &[r"c:\windows\system32\", r"c:\windows\syswow64\"]),
     ("lsass.exe", &[r"c:\windows\system32\"]),
@@ -50,16 +44,14 @@ const SYSTEM_NAMES: &[(&str, &[&str])] = &[
     ("explorer.exe", &[r"c:\windows\"]),
 ];
 
-/// Папки, откуда нормальные программы обычно не запускаются.
 const RISKY_DIRS: &[(&str, &str)] = &[
-    (r"\appdata\local\temp\", "временной папки"),
-    (r"\windows\temp\", "временной папки Windows"),
-    (r"\downloads\", "папки «Загрузки»"),
-    (r"\$recycle.bin\", "корзины"),
-    (r"\users\public\", "общей папки пользователей"),
+    (r"\appdata\local\temp\", "the Temp folder"),
+    (r"\windows\temp\", "the Windows Temp folder"),
+    (r"\downloads\", "Downloads"),
+    (r"\$recycle.bin\", "the Recycle Bin"),
+    (r"\users\public\", "the Public folder"),
 ];
 
-/// Программы, которые не должны запускать командные оболочки.
 const DOC_APPS: &[&str] = &[
     "winword.exe", "excel.exe", "powerpnt.exe", "outlook.exe", "onenote.exe",
     "acrord32.exe", "acrobat.exe", "foxitpdfreader.exe",
@@ -74,50 +66,44 @@ pub fn analyze(p: &ProcFacts) -> Verdict {
     let mut v = Verdict::default();
     let name = p.name.to_lowercase();
     let path = p.path.map(|s| s.to_lowercase());
+    let system = SYSTEM_NAMES.iter().find(|(n, _)| *n == name);
 
-    // 1. Системное имя, но не из своей папки.
-    if let (Some((_, dirs)), Some(path)) = (SYSTEM_NAMES.iter().find(|(n, _)| *n == name), &path) {
-        let home_ok = dirs.iter().any(|d| {
-            path.starts_with(d) && !path[d.len()..].contains('\\')
-        });
+    if let (Some((_, dirs)), Some(path)) = (system, &path) {
+        let home_ok = dirs.iter().any(|d| path.starts_with(d) && !path[d.len()..].contains('\\'));
         if !home_ok {
-            v.add(40, "Маскируется под системный процесс", format!(
-                "Настоящий {} запускается только из {}. Этот запущен из {}.",
+            v.add(40, "Pretends to be a system process", format!(
+                "The real {} only runs from {}. This one runs from {}.",
                 p.name, dirs[0].trim_end_matches('\\'), parent_dir(p.path.unwrap_or_default())
             ));
         }
     }
 
-    // 2. Имя-двойник: на одну букву отличается от системного.
-    if !SYSTEM_NAMES.iter().any(|(n, _)| *n == name) {
+    if system.is_none() {
         if let Some((twin, _)) = SYSTEM_NAMES.iter().find(|(n, _)| is_lookalike(&name, n)) {
-            v.add(35, "Имя похоже на системное", format!(
-                "{} почти совпадает с {}. Так вирусы прячутся среди процессов Windows.",
+            v.add(35, "Name mimics a system process", format!(
+                "{} is one letter away from {}, a common way to hide among Windows processes.",
                 p.name, twin
             ));
         }
     }
 
-    // 3. Запуск из «плохой» папки.
     if let Some(path) = &path {
         if let Some((_, label)) = RISKY_DIRS.iter().find(|(d, _)| path.contains(d)) {
-            v.add(20, "Запущен из необычного места", format!(
-                "Программа работает прямо из {}. Установленные программы так обычно не делают.", label
+            v.add(20, "Runs from an unusual place", format!(
+                "It runs straight out of {}. Installed programs don't normally do that.", label
             ));
         }
     }
 
-    // 4. Нет цифровой подписи. Само по себе это нормально для многих честных
-    // программ, поэтому только усиливает уже найденные подозрения.
+    // Plenty of honest software is unsigned, so this only adds weight to other findings.
     if p.signed == Some(false) && v.score > 0 {
-        v.add(15, "Нет цифровой подписи", "Нельзя проверить, кто выпустил эту программу.".into());
+        v.add(15, "No digital signature", "There's no way to tell who published this program.".into());
     }
 
-    // 5. Документ запускает командную оболочку.
     if let Some(parent) = p.parent_name.map(|s| s.to_lowercase()) {
         if DOC_APPS.contains(&parent.as_str()) && SHELLS.contains(&name.as_str()) {
-            v.add(30, "Странный запуск", format!(
-                "{} запустил {}. Так часто срабатывают вредоносные макросы в документах.",
+            v.add(30, "Odd launch", format!(
+                "{} started {}. This is how malicious document macros usually run.",
                 p.parent_name.unwrap_or_default(), p.name
             ));
         }
@@ -126,7 +112,6 @@ pub fn analyze(p: &ProcFacts) -> Verdict {
     v
 }
 
-/// Уровень для интерфейса: danger / warn / calm.
 pub fn level(score: u32) -> &'static str {
     match score {
         60.. => "danger",
@@ -139,8 +124,7 @@ fn parent_dir(path: &str) -> &str {
     path.rsplit_once('\\').map(|(d, _)| d).unwrap_or(path)
 }
 
-/// Расстояние Левенштейна ровно 1 (замена, вставка или удаление одной буквы)
-/// либо перестановка двух соседних букв.
+/// One edit away (substitution, insertion, deletion) or two adjacent letters swapped.
 fn is_lookalike(a: &str, b: &str) -> bool {
     if a == b {
         return false;

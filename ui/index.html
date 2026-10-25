@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru" data-theme="glass">
+<html lang="en" data-theme="glass">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,43 +15,43 @@
     </div>
     <div class="spacer" data-tauri-drag-region></div>
     <div class="seg" role="tablist">
-      <button class="on" data-tab="all" role="tab">Все</button>
-      <button data-tab="threats" role="tab">Угрозы</button>
+      <button class="on" data-tab="all" role="tab">All</button>
+      <button data-tab="threats" role="tab">Threats</button>
     </div>
     <label class="search">
       <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-      <span class="sr">Поиск процесса</span>
-      <input id="q" placeholder="Поиск" autocomplete="off" spellcheck="false">
+      <span class="sr">Search processes</span>
+      <input id="q" placeholder="Search" autocomplete="off" spellcheck="false">
     </label>
     <div class="wctl">
-      <button id="theme" aria-label="Сменить тему" title="Тема">
+      <button id="theme" aria-label="Switch theme" title="Theme">
         <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg>
       </button>
-      <button id="min" aria-label="Свернуть"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8"/></svg></button>
-      <button id="close" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
+      <button id="min" aria-label="Minimize"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8"/></svg></button>
+      <button id="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
     </div>
   </header>
 
   <div class="head">
-    <h1 id="headline">Сканирую…</h1>
+    <h1 id="headline">Scanning…</h1>
     <div id="sub" class="muted"></div>
   </div>
 
   <div class="cols row-grid">
-    <div>Процесс</div><div class="r">ЦП</div><div class="r">Память</div><div>Риск</div>
+    <div>Process</div><div class="r">CPU</div><div class="r">Memory</div><div>Risk</div>
   </div>
 
   <main id="list"></main>
 
   <footer class="foot">
-    <span class="ok-dot"></span><span>Мониторинг включён</span>
+    <span class="ok-dot"></span><span>Monitoring on</span>
     <span id="self" class="num"></span>
   </footer>
 
   <div id="detail" class="detail" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="d-name">
       <div class="sheet-top">
-        <button id="d-close" class="icon-btn" aria-label="Закрыть"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
+        <button id="d-close" class="icon-btn" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
       </div>
       <div class="d-head">
         <div id="d-tile" class="tile big" aria-hidden="true"></div>
@@ -64,19 +64,19 @@
           <div id="d-level" class="d-lvl"></div>
         </div>
       </div>
-      <div id="d-why-label" class="label">Почему это подозрительно</div>
+      <div id="d-why-label" class="label">Why it looks suspicious</div>
       <div id="d-reasons" class="reasons"></div>
       <dl class="facts">
-        <dt>Путь</dt><dd id="d-path" class="mono"></dd>
-        <dt>Родитель</dt><dd id="d-parent"></dd>
-        <dt>Подпись</dt><dd id="d-sign"></dd>
+        <dt>Path</dt><dd id="d-path" class="mono"></dd>
+        <dt>Parent</dt><dd id="d-parent"></dd>
+        <dt>Signature</dt><dd id="d-sign"></dd>
       </dl>
       <div class="actions">
-        <button id="a-kill" class="btn danger">Завершить процесс</button>
-        <button id="a-reveal" class="btn">Показать в папке</button>
-        <button id="a-vt" class="btn">Проверить на VirusTotal</button>
+        <button id="a-kill" class="btn danger">End process</button>
+        <button id="a-reveal" class="btn">Show in folder</button>
+        <button id="a-vt" class="btn">Check on VirusTotal</button>
         <span class="spacer"></span>
-        <button id="a-trust" class="btn link">Это моё</button>
+        <button id="a-trust" class="btn link">Trust it</button>
       </div>
     </div>
   </div>

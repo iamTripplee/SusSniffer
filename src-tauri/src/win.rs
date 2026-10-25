@@ -1,5 +1,3 @@
-//! Тонкая обёртка над Windows API. Всё unsafe живёт здесь.
-
 use std::mem::size_of;
 
 use windows::core::{GUID, PCWSTR, PWSTR};
@@ -27,7 +25,6 @@ pub struct RawProc {
     pub name: String,
 }
 
-/// Снимок всех процессов. Дёшево: один системный вызов на весь список.
 pub fn list_processes() -> Vec<RawProc> {
     let mut out = Vec::with_capacity(400);
     unsafe {
@@ -76,7 +73,7 @@ pub fn exe_path(pid: u32) -> Option<String> {
     Some(String::from_utf16_lossy(&buf[..len as usize]))
 }
 
-/// Суммарное время ЦП процесса в 100-нс тиках и рабочий набор памяти в байтах.
+/// Total CPU time in 100 ns ticks and working set in bytes.
 pub fn usage(pid: u32) -> Option<(u64, u64)> {
     let h = open(pid, PROCESS_QUERY_LIMITED_INFORMATION)?;
     let ft = |f: FILETIME| ((f.dwHighDateTime as u64) << 32) | f.dwLowDateTime as u64;
@@ -100,8 +97,7 @@ pub fn kill(pid: u32) -> bool {
     }
 }
 
-/// Есть ли у файла действительная встроенная подпись Authenticode.
-/// Сетевые проверки отозванных сертификатов отключены, чтобы не тормозить.
+/// Embedded Authenticode check. Revocation lookups are off to keep it offline and fast.
 pub fn is_signed(path: &str) -> bool {
     let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
     let mut file = WINTRUST_FILE_INFO {
@@ -128,7 +124,7 @@ pub fn is_signed(path: &str) -> bool {
     }
 }
 
-/// Идёт полноэкранная игра или презентация — не показываем всплывашки.
+/// True while a fullscreen game or presentation is running.
 pub fn user_is_busy() -> bool {
     unsafe {
         matches!(

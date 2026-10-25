@@ -1,4 +1,3 @@
-// Без консольного окна в релизной сборке.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod ipc;
@@ -15,15 +14,18 @@ use std::time::Instant;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, RunEvent};
+use tauri_plugin_autostart::ManagerExt as _;
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
 use watcher::{Proc, Shared};
 
 pub const TOKEN_ENV: &str = "SUSSNIFFER_TOKEN";
+/// Value name under HKCU\...\Run; the uninstaller removes it too.
+const AUTOSTART_NAME: &str = "SusSniffer";
 
 fn main() {
     let ctx = tauri::generate_context!();
@@ -38,13 +40,11 @@ fn main() {
     }
 }
 
-/// Процесс окна: запускается по клику, живёт, пока открыто окно.
 struct UiLauncher {
     port: u16,
     token: String,
     child: Mutex<Option<Child>>,
-    /// Просьба к уже открытому окну выйти на передний план; окно читает её
-    /// вместе со следующим снимком.
+    /// Asks an already open window to come to the front on its next poll.
     focus: Arc<AtomicBool>,
 }
 
@@ -73,10 +73,14 @@ impl UiLauncher {
 
 fn run_core(ctx: tauri::Context, show_window: bool) {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| open_ui(app)))
+        .plugin(tauri_plugin_autostart::Builder::new().app_name(AUTOSTART_NAME).args(["--minimized"]).build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .setup(move |app| {
-            let shared = Shared::new(app.path().app_data_dir()?);
+            let data_dir = app.path().app_data_dir()?;
+            let autostart_on = setup_autostart(app.handle(), &data_dir);
+            let shared = Shared::new(data_dir);
 
             let handle = app.handle().clone();
             watcher::spawn(shared.clone(), move |found| notify(&handle, &found));
@@ -90,16 +94,27 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let port = ipc::serve(token.clone(), handler)?;
             app.manage(Arc::new(UiLauncher { port, token, child: Mutex::new(None), focus }));
 
-            let open = MenuItem::with_id(app, "open", "Открыть SusSniffer", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &quit])?;
+            let open = MenuItem::with_id(app, "open", "Open SusSniffer", true, None::<&str>)?;
+            let autostart =
+                CheckMenuItem::with_id(app, "autostart", "Start with Windows", true, autostart_on, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let sep = PredefinedMenuItem::separator(app)?;
+            let menu = Menu::with_items(app, &[&open, &autostart, &sep, &quit])?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().expect("app icon"))
                 .tooltip("SusSniffer")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
-                .on_menu_event(|app, e| match e.id.as_ref() {
+                .on_menu_event(move |app, e| match e.id.as_ref() {
                     "open" => open_ui(app),
+                    "autostart" => {
+                        let on = autostart.is_checked().unwrap_or(false);
+                        let res = if on { app.autolaunch().enable() } else { app.autolaunch().disable() };
+                        let actual = app.autolaunch().is_enabled().unwrap_or(false);
+                        if res.is_err() || actual != on {
+                            let _ = autostart.set_checked(actual);
+                        }
+                    }
                     "quit" => {
                         app.state::<Arc<UiLauncher>>().close();
                         app.exit(0);
@@ -122,7 +137,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
         .expect("failed to build app");
 
     app.run(|_, event| {
-        // У ядра нет окон, и завершаться оно должно только из меню трея.
+        // The core has no windows; it only quits from the tray menu.
         if let RunEvent::ExitRequested { api, code: None, .. } = event {
             api.prevent_exit();
         }
@@ -131,6 +146,20 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
 
 fn open_ui(app: &AppHandle) {
     app.state::<Arc<UiLauncher>>().open();
+}
+
+/// On by default on first run. Later runs keep the user's choice but re-register
+/// so the entry points at the current exe after a reinstall.
+fn setup_autostart(app: &AppHandle, data_dir: &std::path::Path) -> bool {
+    let marker = data_dir.join("first-run-done");
+    let launcher = app.autolaunch();
+    let want = if marker.exists() { launcher.is_enabled().unwrap_or(false) } else { true };
+    if want {
+        let _ = launcher.enable();
+    }
+    let _ = std::fs::create_dir_all(data_dir);
+    let _ = std::fs::write(&marker, b"");
+    launcher.is_enabled().unwrap_or(false)
 }
 
 fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, pid: Option<u32>) -> Value {
@@ -151,7 +180,7 @@ fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, p
             None => json!(false),
         },
         "reveal" => json!(path().is_some_and(|p| Command::new("explorer").arg(format!("/select,{p}")).spawn().is_ok())),
-        "virustotal" => match path().ok_or_else(|| "Не удалось узнать путь к файлу".to_string()).and_then(|p| sha256_file(&p)) {
+        "virustotal" => match path().ok_or_else(|| "Can't resolve the file path".to_string()).and_then(|p| sha256_file(&p)) {
             Ok(hex) => match app.opener().open_url(format!("https://www.virustotal.com/gui/file/{hex}"), None::<&str>) {
                 Ok(()) => json!(true),
                 Err(e) => json!({ "error": e.to_string() }),
@@ -179,16 +208,16 @@ fn sha256_file(path: &str) -> Result<String, String> {
 fn notify(app: &AppHandle, found: &[Proc]) {
     let (title, body) = match found {
         [p] => (
-            "Подозрительный процесс".to_string(),
+            "Suspicious process".to_string(),
             format!(
-                "{} — риск {} из 100. {}",
+                "{} — risk {}/100. {}",
                 p.name,
                 p.score,
                 p.reasons.first().map(|r| r.title.as_str()).unwrap_or("")
             ),
         ),
         many => (
-            format!("Подозрительных процессов: {}", many.len()),
+            format!("{} suspicious processes", many.len()),
             many.iter().map(|p| p.name.as_str()).collect::<Vec<_>>().join(", "),
         ),
     };

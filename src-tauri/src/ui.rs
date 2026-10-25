@@ -1,5 +1,5 @@
-//! Процесс окна. Всё, что нужно, берёт у ядра через `ipc`, и завершается
-//! вместе с закрытием окна — встроенный браузер выгружается целиком.
+//! The window process. It exits when the window closes, which is the only
+//! way to get WebView2 fully out of memory.
 
 use serde_json::Value;
 use tauri::window::{Effect, EffectsBuilder};
