@@ -1,0 +1,24 @@
+[package]
+name = "sussniffer"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tauri = { version = "2.12.5", features = ["tray-icon"] }
+tauri-plugin-notification = "2.7.0"
+tauri-plugin-opener = "2.7.2"
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Threading", "Win32_System_ProcessStatus", "Win32_Security_WinTrust", "Win32_UI_Shell", "Win32_System_SystemInformation", "Win32_Security_Cryptography"] }
+
+[build-dependencies]
+tauri-build = "2.7.4"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = "s"
+panic = "abort"
+strip = true
+
