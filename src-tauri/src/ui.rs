@@ -71,7 +71,7 @@ pub fn run(ctx: tauri::Context, port: u16, token: String) {
         .invoke_handler(tauri::generate_handler![core, hardware, startup_list, startup_set])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
-                .title("SusSniffer")
+                .title("WinGlance")
                 .inner_size(880.0, 640.0)
                 .min_inner_size(640.0, 460.0)
                 .decorations(false)

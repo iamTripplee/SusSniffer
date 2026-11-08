@@ -77,7 +77,7 @@
         } catch (err) {
           const msg = String(err?.message ?? err);
           alert(msg === 'Needs admin rights'
-            ? `${it.name} is set up for all users. Turning it off needs SusSniffer to run as administrator.`
+            ? `${it.name} is set up for all users. Turning it off needs WinGlance to run as administrator.`
             : msg);
         }
       });

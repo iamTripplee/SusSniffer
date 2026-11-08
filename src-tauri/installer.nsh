@@ -1,3 +1,3 @@
 !macro NSIS_HOOK_POSTUNINSTALL
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "SusSniffer"
+  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "WinGlance"
 !macroend

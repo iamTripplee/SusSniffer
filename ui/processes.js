@@ -97,7 +97,7 @@
     $('d-why-label').textContent = p.reasons.length ? 'Why it looks suspicious' : 'Checks';
     $('d-reasons').innerHTML = p.reasons.length
       ? p.reasons.map((r) => `<div class="reason"><div class="pts">+${r.pts}</div><div><div class="rt">${esc(r.title)}</div><div class="rx">${esc(r.text)}</div></div></div>`).join('')
-      : `<div class="reason"><div><div class="rt">Nothing suspicious</div><div class="rx">None of the SusSniffer rules matched.</div></div></div>`;
+      : `<div class="reason"><div><div class="rt">Nothing suspicious</div><div class="rx">None of the WinGlance rules matched.</div></div></div>`;
     $('d-path').textContent = p.path || 'unavailable (protected system process)';
     $('d-parent').textContent = p.parent_name ? `${p.parent_name} (PID ${p.ppid})` : 'exited or unknown';
     $('d-sign').textContent = p.signed == null ? 'not checked' : p.signed ? 'valid' : 'missing';

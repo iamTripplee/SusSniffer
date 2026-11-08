@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "SusSniffer",
-  "version": "0.2.0",
-  "identifier": "com.iamtripplee.sussniffer",
+  "productName": "WinGlance",
+  "version": "0.3.0",
+  "identifier": "com.iamtripplee.winglance",
   "build": {
     "frontendDist": "../ui"
   },

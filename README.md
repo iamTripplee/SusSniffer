@@ -1,4 +1,4 @@
-# SusSniffer
+# WinGlance
 
 A lightweight Task Manager alternative for Windows that also watches running processes and tells you, in plain words, why one of them looks suspicious.
 

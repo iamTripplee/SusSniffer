@@ -25,9 +25,9 @@ use tauri_plugin_opener::OpenerExt;
 
 use watcher::{Proc, Shared};
 
-pub const TOKEN_ENV: &str = "SUSSNIFFER_TOKEN";
+pub const TOKEN_ENV: &str = "WINGLANCE_TOKEN";
 /// Value name under HKCU\...\Run; the uninstaller removes it too.
-const AUTOSTART_NAME: &str = "SusSniffer";
+const AUTOSTART_NAME: &str = "WinGlance";
 
 fn main() {
     let ctx = tauri::generate_context!();
@@ -96,7 +96,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let port = ipc::serve(token.clone(), handler)?;
             app.manage(Arc::new(UiLauncher { port, token, child: Mutex::new(None), focus }));
 
-            let open = MenuItem::with_id(app, "open", "Open SusSniffer", true, None::<&str>)?;
+            let open = MenuItem::with_id(app, "open", "Open WinGlance", true, None::<&str>)?;
             let autostart =
                 CheckMenuItem::with_id(app, "autostart", "Start with Windows", true, autostart_on, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
@@ -104,7 +104,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let menu = Menu::with_items(app, &[&open, &autostart, &sep, &quit])?;
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().expect("app icon"))
-                .tooltip("SusSniffer")
+                .tooltip("WinGlance")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, e| match e.id.as_ref() {

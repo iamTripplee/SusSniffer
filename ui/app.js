@@ -69,7 +69,7 @@ const App = {
       const snap = await core('snapshot');
       this.procs = snap.procs;
       const t = snap.totals;
-      $('self').textContent = `SusSniffer core: ${fmtCpu(t.self_cpu)} CPU · ${fmtBytes(t.self_mem)}`;
+      $('self').textContent = `WinGlance core: ${fmtCpu(t.self_cpu)} CPU · ${fmtBytes(t.self_mem)}`;
       if (snap.focus) {
         await appWindow.unminimize();
         await appWindow.setFocus();
