@@ -264,3 +264,8 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 4px; }
 .key { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .key i { width: 10px; height: 2px; border-radius: 1px; }
 .spark path, .spark line { stroke-linecap: round; }
+.upd { height: 22px; padding: 0 10px; border-radius: 11px; font-size: 11px; color: var(--text2); background: var(--field); }
+.upd:hover { color: var(--text); }
+.upd.go { background: var(--c1); color: #fff; font-weight: 600; }
+.upd:disabled { opacity: .6; cursor: default; }
+#version { color: var(--text3); }

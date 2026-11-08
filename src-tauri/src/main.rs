@@ -84,7 +84,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
         .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
             let autostart_on = setup_autostart(app.handle(), &data_dir);
-            let shared = Shared::new(data_dir);
+            let shared = Shared::new(data_dir.clone());
 
             let handle = app.handle().clone();
             watcher::spawn(shared.clone(), move |found| notify(&handle, &found));
@@ -105,7 +105,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let menu = Menu::with_items(app, &[&open, &autostart, &update, &sep, &quit])?;
-            app.manage(updater::Updates::new(update));
+            app.manage(updater::Updates::new(update, app.package_info().version.to_string(), &data_dir));
             TrayIconBuilder::with_id("tray")
                 .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?)
                 .tooltip(format!("WinGlance {}", app.package_info().version))
@@ -113,7 +113,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, e| match e.id.as_ref() {
                     "open" => open_ui(app),
-                    "update" => updater::on_click(app),
+                    "update" => updater::act(app, updater::Source::Tray),
                     "autostart" => {
                         let on = autostart.is_checked().unwrap_or(false);
                         let res = if on { app.autolaunch().enable() } else { app.autolaunch().disable() };
@@ -136,7 +136,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
                 .build(app)?;
 
             updater::spawn(app.handle().clone());
-            if show_window {
+            if show_window || app.state::<updater::Updates>().take_reopen() {
                 open_ui(app.handle());
             }
             Ok(())
@@ -177,7 +177,8 @@ fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, p
             *shared.ui_seen.lock().unwrap() = Some(Instant::now());
             let mut procs: Vec<Proc> = shared.procs.lock().unwrap().values().cloned().collect();
             procs.sort_by(|a, b| b.score.cmp(&a.score).then(b.cpu.total_cmp(&a.cpu)));
-            json!({ "procs": procs, "totals": watcher::totals(shared), "focus": focus.swap(false, Ordering::Relaxed) })
+            let update = app.try_state::<updater::Updates>().map(|u| u.status());
+            json!({ "procs": procs, "totals": watcher::totals(shared), "focus": focus.swap(false, Ordering::Relaxed), "update": update })
         }
         "kill" => json!(pid.is_some_and(win::kill)),
         "trust" => match path() {
@@ -195,6 +196,10 @@ fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, p
             },
             Err(e) => json!({ "error": e }),
         },
+        "update" => {
+            updater::act(app, updater::Source::Window);
+            json!(true)
+        }
         _ => json!({ "error": "unknown command" }),
     }
 }

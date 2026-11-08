@@ -47,7 +47,7 @@
     $('st-head').textContent = `${plural(state.items.length, 'app')} start with Windows`;
     $('st-sub').textContent = [sus ? `${sus} look${sus === 1 ? 's' : ''} suspicious` : 'Nothing suspicious', newest ? `newest installed ${fmtDate(newest).toLowerCase()}` : ''].filter(Boolean).join(' · ');
     const on = state.items.filter((it) => it.enabled).length;
-    $('st-count').textContent = `${on} enabled · ${state.items.length - on} disabled`;
+    $('foot-info').textContent = `${on} enabled · ${state.items.length - on} disabled`;
     $('st-list').innerHTML = items.length ? items.map(rowHtml).join('') : `<div class="empty">${state.loading ? 'Loading…' : 'Nothing found'}</div>`;
   }
 

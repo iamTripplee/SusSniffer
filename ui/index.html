@@ -52,10 +52,6 @@
       <button class="col" data-sort="risk">Risk<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
     </div>
     <main id="list"></main>
-    <footer class="foot">
-      <span class="ok-dot"></span><span>Monitoring on</span>
-      <span id="self" class="num"></span>
-    </footer>
   </section>
 
   <section id="view-startup" class="view" hidden>
@@ -67,16 +63,20 @@
       <div>App</div><div>Publisher</div><div>Where</div><div>Installed</div><div class="r">Using now</div><div>Risk</div><div class="r">On</div>
     </div>
     <main id="st-list"></main>
-    <footer class="foot">
-      <span>Run keys and Startup folders</span>
-      <span class="spacer"></span>
-      <span id="st-count"></span>
-    </footer>
   </section>
 
   <section id="view-hardware" class="view" hidden>
     <main id="hw" class="hw-grid"></main>
   </section>
+
+  <footer class="foot">
+    <span class="ok-dot"></span><span>Monitoring on</span>
+    <span id="self" class="num"></span>
+    <span class="spacer"></span>
+    <span id="foot-info"></span>
+    <span id="version" class="num"></span>
+    <button id="update" class="upd" hidden></button>
+  </footer>
 
   <div id="detail" class="detail" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="d-name">

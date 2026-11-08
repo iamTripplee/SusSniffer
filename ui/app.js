@@ -61,6 +61,7 @@ const App = {
     $('search').hidden = name === 'hardware';
     $('hw-note').hidden = name !== 'hardware';
     $('q').value = '';
+    $('foot-info').textContent = '';
     this.views[name].enter?.();
   },
 
@@ -70,6 +71,7 @@ const App = {
       this.procs = snap.procs;
       const t = snap.totals;
       $('self').textContent = `WinGlance core: ${fmtCpu(t.self_cpu)} CPU · ${fmtBytes(t.self_mem)}`;
+      this.renderUpdate(snap.update);
       if (snap.focus) {
         await appWindow.unminimize();
         await appWindow.setFocus();
@@ -80,9 +82,27 @@ const App = {
     }
   },
 
+  renderUpdate(u) {
+    const btn = $('update');
+    if (!u) return;
+    $('version').textContent = `v${u.current}`;
+    const busy = u.phase === 'checking' || u.phase === 'downloading';
+    btn.hidden = false;
+    btn.disabled = busy;
+    btn.classList.toggle('go', !!u.available && !busy);
+    btn.title = u.error || '';
+    btn.textContent = u.phase === 'checking' ? 'Checking…'
+      : u.phase === 'downloading' ? 'Updating…'
+      : u.available ? `Update to ${u.available}`
+      : u.phase === 'up_to_date' ? 'Up to date'
+      : u.phase === 'failed' ? 'Check failed, retry'
+      : 'Check for updates';
+  },
+
   start() {
     document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => this.show(b.dataset.view)));
     $('q').addEventListener('input', (e) => this.views[this.current].search?.(e.target.value));
+    $('update').addEventListener('click', () => core('update').then(() => this.tick()));
     $('min').addEventListener('click', () => appWindow.minimize());
     $('close').addEventListener('click', () => appWindow.close());
 
