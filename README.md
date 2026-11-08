@@ -48,3 +48,7 @@ Rule tests:
 cd src-tauri
 cargo test
 ```
+
+## License
+
+[MIT](LICENSE)
