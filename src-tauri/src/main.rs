@@ -107,7 +107,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let menu = Menu::with_items(app, &[&open, &autostart, &update, &sep, &quit])?;
             app.manage(updater::Updates::new(update));
             TrayIconBuilder::with_id("tray")
-                .icon(app.default_window_icon().cloned().expect("app icon"))
+                .icon(tauri::image::Image::from_bytes(include_bytes!("../icons/tray.png"))?)
                 .tooltip(format!("WinGlance {}", app.package_info().version))
                 .menu(&menu)
                 .show_menu_on_left_click(false)

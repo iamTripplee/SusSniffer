@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <clipPath id="sq"><rect x="56" y="56" width="912" height="912" rx="208"/></clipPath>
+    <clipPath id="sq"><rect x="24" y="24" width="976" height="976" rx="222"/></clipPath>
     <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
       <stop offset="0" stop-color="#0d4a6a"/>
       <stop offset="1" stop-color="#061524"/>
@@ -35,15 +35,16 @@
   </defs>
 
   <g clip-path="url(#sq)">
-    <rect x="56" y="56" width="912" height="912" fill="url(#bg)"/>
+    <rect x="24" y="24" width="976" height="976" fill="url(#bg)"/>
     <g filter="url(#blur60)">
       <circle cx="290" cy="320" r="200" fill="#16e0c0" opacity="0.7"/>
       <circle cx="740" cy="700" r="240" fill="#2f7bff" opacity="0.85"/>
       <circle cx="760" cy="300" r="150" fill="#ffb347" opacity="0.5"/>
     </g>
   </g>
-  <rect x="57.5" y="57.5" width="909" height="909" rx="206.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+  <rect x="25.5" y="25.5" width="973" height="973" rx="220.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
 
+  <g transform="translate(512 512) scale(1.2) translate(-512 -512)">
   <path d="M140 512 C 300 238, 724 238, 884 512 C 724 786, 300 786, 140 512 Z" fill="#000" fill-opacity="0.01" filter="url(#shadow)"/>
   <g clip-path="url(#eyeClip)">
     <rect x="140" y="238" width="744" height="548" fill="#0a2f45"/>
@@ -59,4 +60,5 @@
 
   <ellipse cx="440" cy="408" rx="34" ry="44" fill="#ffffff" opacity="0.95"/>
   <ellipse cx="380" cy="360" rx="170" ry="34" transform="rotate(-14 380 360)" fill="#ffffff" opacity="0.3" filter="url(#blur10)"/>
+  </g>
 </svg>
