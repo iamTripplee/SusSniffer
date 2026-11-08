@@ -15,9 +15,10 @@ pub struct Request {
     pub token: String,
     pub cmd: String,
     pub pid: Option<u32>,
+    pub arg: Option<String>,
 }
 
-pub type Handler = dyn Fn(&str, Option<u32>) -> Value + Send + Sync;
+pub type Handler = dyn Fn(&str, Option<u32>, Option<&str>) -> Value + Send + Sync;
 
 pub fn random_token() -> String {
     let mut out = String::new();
@@ -47,7 +48,7 @@ fn handle(stream: TcpStream, token: &str, handler: &Handler) -> std::io::Result<
     let mut line = String::new();
     BufReader::new(&stream).take(64 * 1024).read_line(&mut line)?;
     let reply = match serde_json::from_str::<Request>(&line) {
-        Ok(req) if req.token == token => handler(&req.cmd, req.pid),
+        Ok(req) if req.token == token => handler(&req.cmd, req.pid, req.arg.as_deref()),
         _ => json!({ "error": "unauthorized" }),
     };
     let mut w = &stream;
@@ -55,10 +56,10 @@ fn handle(stream: TcpStream, token: &str, handler: &Handler) -> std::io::Result<
     w.write_all(b"\n")
 }
 
-pub fn call(port: u16, token: &str, cmd: &str, pid: Option<u32>) -> Result<Value, String> {
+pub fn call(port: u16, token: &str, cmd: &str, pid: Option<u32>, arg: Option<String>) -> Result<Value, String> {
     let stream = TcpStream::connect(("127.0.0.1", port)).map_err(|e| format!("Core is not running: {e}"))?;
     stream.set_read_timeout(Some(Duration::from_secs(10))).ok();
-    let req = Request { token: token.into(), cmd: cmd.into(), pid };
+    let req = Request { token: token.into(), cmd: cmd.into(), pid, arg };
     let mut w = &stream;
     w.write_all(serde_json::to_string(&req).map_err(|e| e.to_string())?.as_bytes()).map_err(|e| e.to_string())?;
     w.write_all(b"\n").map_err(|e| e.to_string())?;

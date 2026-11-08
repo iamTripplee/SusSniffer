@@ -13,40 +13,70 @@
       <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><circle cx="12" cy="11" r="2.5"/></svg>
       <span>SusSniffer</span>
     </div>
+    <nav class="seg" id="nav" aria-label="Sections">
+      <button class="on" data-view="processes">Processes</button>
+      <button data-view="startup">Startup</button>
+      <button data-view="hardware">Hardware</button>
+    </nav>
     <div class="spacer" data-tauri-drag-region></div>
-    <div class="seg" role="tablist">
-      <button class="on" data-tab="all" role="tab">All</button>
-      <button data-tab="threats" role="tab">Threats</button>
-    </div>
-    <label class="search">
+    <label class="search" id="search">
       <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
-      <span class="sr">Search processes</span>
+      <span class="sr">Search</span>
       <input id="q" placeholder="Search" autocomplete="off" spellcheck="false">
     </label>
+    <span id="hw-note" class="muted small" hidden>Last 60 seconds</span>
     <div class="wctl">
       <button id="theme" aria-label="Switch theme" title="Theme">
-        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4v16" /><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" class="fill"/></svg>
       </button>
       <button id="min" aria-label="Minimize"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8"/></svg></button>
       <button id="close" aria-label="Close"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
     </div>
   </header>
 
-  <div class="head">
-    <h1 id="headline">Scanning…</h1>
-    <div id="sub" class="muted"></div>
-  </div>
+  <section id="view-processes" class="view">
+    <div class="head">
+      <h1 id="headline">Scanning…</h1>
+      <div id="sub" class="muted"></div>
+      <span class="spacer"></span>
+      <button id="sort-pill" class="pill" hidden></button>
+      <div class="seg" id="filter">
+        <button class="on" data-tab="all">All</button>
+        <button data-tab="threats">Threats</button>
+      </div>
+    </div>
+    <div class="cols row-grid">
+      <div>Process</div>
+      <button class="col r" data-sort="cpu">CPU<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
+      <button class="col r" data-sort="mem">Memory<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
+      <button class="col" data-sort="risk">Risk<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
+    </div>
+    <main id="list"></main>
+    <footer class="foot">
+      <span class="ok-dot"></span><span>Monitoring on</span>
+      <span id="self" class="num"></span>
+    </footer>
+  </section>
 
-  <div class="cols row-grid">
-    <div>Process</div><div class="r">CPU</div><div class="r">Memory</div><div>Risk</div>
-  </div>
+  <section id="view-startup" class="view" hidden>
+    <div class="head">
+      <h1 id="st-head">Startup</h1>
+      <div id="st-sub" class="muted"></div>
+    </div>
+    <div class="cols st-grid">
+      <div>App</div><div>Publisher</div><div>Where</div><div>Installed</div><div class="r">Using now</div><div>Risk</div><div class="r">On</div>
+    </div>
+    <main id="st-list"></main>
+    <footer class="foot">
+      <span>Run keys and Startup folders</span>
+      <span class="spacer"></span>
+      <span id="st-count"></span>
+    </footer>
+  </section>
 
-  <main id="list"></main>
-
-  <footer class="foot">
-    <span class="ok-dot"></span><span>Monitoring on</span>
-    <span id="self" class="num"></span>
-  </footer>
+  <section id="view-hardware" class="view" hidden>
+    <main id="hw" class="hw-grid"></main>
+  </section>
 
   <div id="detail" class="detail" hidden>
     <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="d-name">
@@ -82,5 +112,8 @@
   </div>
 </div>
 <script src="app.js"></script>
+<script src="processes.js"></script>
+<script src="startup.js"></script>
+<script src="hardware.js"></script>
 </body>
 </html>

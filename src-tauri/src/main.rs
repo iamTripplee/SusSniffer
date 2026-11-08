@@ -1,7 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod hw;
 mod ipc;
 mod rules;
+mod startup;
 mod ui;
 mod watcher;
 mod win;
@@ -89,7 +91,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let focus = Arc::new(AtomicBool::new(false));
             let handler = {
                 let (shared, handle, focus) = (shared.clone(), app.handle().clone(), focus.clone());
-                Arc::new(move |cmd: &str, pid: Option<u32>| handle_cmd(&shared, &handle, &focus, cmd, pid))
+                Arc::new(move |cmd: &str, pid: Option<u32>, arg: Option<&str>| handle_cmd(&shared, &handle, &focus, cmd, pid, arg))
             };
             let port = ipc::serve(token.clone(), handler)?;
             app.manage(Arc::new(UiLauncher { port, token, child: Mutex::new(None), focus }));
@@ -162,7 +164,7 @@ fn setup_autostart(app: &AppHandle, data_dir: &std::path::Path) -> bool {
     launcher.is_enabled().unwrap_or(false)
 }
 
-fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, pid: Option<u32>) -> Value {
+fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, pid: Option<u32>, _arg: Option<&str>) -> Value {
     let path = || pid.and_then(|p| shared.procs.lock().unwrap().get(&p).and_then(|x| x.path.clone()));
     match cmd {
         "snapshot" => {
@@ -223,3 +225,4 @@ fn notify(app: &AppHandle, found: &[Proc]) {
     };
     let _ = app.notification().builder().title(title).body(body).show();
 }
+
