@@ -42,6 +42,8 @@ npm run build
 
 The installer ends up in `src-tauri/target/release/bundle/nsis/`.
 
+Release builds are signed for the built-in updater. Set `TAURI_SIGNING_PRIVATE_KEY` to the private key path before `npm run build`, then upload the installer and `latest.json` to the GitHub release.
+
 Rule tests:
 
 ```bash

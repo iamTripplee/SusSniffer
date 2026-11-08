@@ -5,6 +5,7 @@ mod ipc;
 mod rules;
 mod startup;
 mod ui;
+mod updater;
 mod watcher;
 mod win;
 
@@ -42,7 +43,7 @@ fn main() {
     }
 }
 
-struct UiLauncher {
+pub(crate) struct UiLauncher {
     port: u16,
     token: String,
     child: Mutex<Option<Child>>,
@@ -66,7 +67,7 @@ impl UiLauncher {
             .ok();
     }
 
-    fn close(&self) {
+    pub(crate) fn close(&self) {
         if let Some(mut c) = self.child.lock().unwrap().take() {
             let _ = c.kill();
         }
@@ -79,6 +80,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
         .plugin(tauri_plugin_autostart::Builder::new().app_name(AUTOSTART_NAME).args(["--minimized"]).build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
             let autostart_on = setup_autostart(app.handle(), &data_dir);
@@ -99,16 +101,19 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
             let open = MenuItem::with_id(app, "open", "Open WinGlance", true, None::<&str>)?;
             let autostart =
                 CheckMenuItem::with_id(app, "autostart", "Start with Windows", true, autostart_on, None::<&str>)?;
+            let update = MenuItem::with_id(app, "update", "Check for updates", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
-            let menu = Menu::with_items(app, &[&open, &autostart, &sep, &quit])?;
+            let menu = Menu::with_items(app, &[&open, &autostart, &update, &sep, &quit])?;
+            app.manage(updater::Updates::new(update));
             TrayIconBuilder::with_id("tray")
                 .icon(app.default_window_icon().cloned().expect("app icon"))
-                .tooltip("WinGlance")
+                .tooltip(format!("WinGlance {}", app.package_info().version))
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, e| match e.id.as_ref() {
                     "open" => open_ui(app),
+                    "update" => updater::on_click(app),
                     "autostart" => {
                         let on = autostart.is_checked().unwrap_or(false);
                         let res = if on { app.autolaunch().enable() } else { app.autolaunch().disable() };
@@ -130,6 +135,7 @@ fn run_core(ctx: tauri::Context, show_window: bool) {
                 })
                 .build(app)?;
 
+            updater::spawn(app.handle().clone());
             if show_window {
                 open_ui(app.handle());
             }
