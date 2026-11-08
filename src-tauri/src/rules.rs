@@ -161,7 +161,7 @@ mod tests {
     fn svchost_from_temp_is_danger() {
         let v = analyze(&ProcFacts {
             signed: Some(false),
-            ..facts("svchost.exe", r"C:\Users\andre\AppData\Local\Temp\svchost.exe")
+            ..facts("svchost.exe", r"C:\Users\user\AppData\Local\Temp\svchost.exe")
         });
         assert_eq!(v.score, 75);
         assert_eq!(level(v.score), "danger");
@@ -199,7 +199,7 @@ mod tests {
     fn unsigned_alone_is_not_suspicious() {
         let v = analyze(&ProcFacts {
             signed: Some(false),
-            ..facts("python.exe", r"C:\Users\andre\AppData\Local\Programs\Python\python.exe")
+            ..facts("python.exe", r"C:\Users\user\AppData\Local\Programs\Python\python.exe")
         });
         assert_eq!(v.score, 0);
     }
