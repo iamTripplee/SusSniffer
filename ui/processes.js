@@ -7,6 +7,48 @@
   const procs = () => App.procs;
   const displayName = (p) => p.display_name || p.name;
   const exitTime = new Intl.DateTimeFormat('en', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit' });
+  const icons = new Map();
+  let iconQueue = Promise.resolve();
+
+  function iconImage(src) {
+    return `<img src="${esc(src)}" alt="">`;
+  }
+
+  function appIcon(path) {
+    if (!path) return null;
+    if (icons.has(path)) return icons.get(path).src;
+    if (icons.size >= 256) {
+      const active = new Set(procs().filter((p) => p.is_app).map((p) => p.path));
+      const unused = [...icons.keys()].find((key) => !active.has(key));
+      if (!unused) return null;
+      icons.delete(unused);
+    }
+    const entry = { src: null };
+    icons.set(path, entry);
+    iconQueue = iconQueue.then(async () => {
+      if (icons.get(path) !== entry) return;
+      try {
+        entry.src = await invoke('app_icon', { path });
+      } catch {
+        return;
+      }
+      if (!entry.src || icons.get(path) !== entry) return;
+      for (const tile of document.querySelectorAll('[data-icon-path]')) {
+        if (tile.dataset.iconPath === path) {
+          tile.classList.add('has-icon');
+          tile.innerHTML = iconImage(entry.src);
+        }
+      }
+    });
+    return null;
+  }
+
+  function updateThreatCount(count, danger) {
+    const badge = $('threat-count');
+    badge.hidden = count === 0;
+    badge.textContent = count;
+    badge.classList.toggle('high', danger);
+  }
 
   function whoHtml(p) {
     const name = displayName(p);
@@ -15,8 +57,10 @@
       ? `<span class="sub" style="color:${toneVar[p.level]}">${esc(reason.title)}</span>`
       : `<span class="sub mono">${esc(p.display_name ? p.name : p.path || 'Path unavailable')}</span>`;
     const status = p.is_app && p.not_responding ? '<span class="app-status">Not responding</span>' : '';
+    const iconPath = p.is_app ? p.path : null;
+    const src = appIcon(iconPath);
     return `<span class="who">
-      <span class="tile" style="background:${tileColor(name)}" aria-hidden="true">${esc(name[0]?.toUpperCase() || '?')}</span>
+      <span class="tile${src ? ' has-icon' : ''}" ${iconPath ? `data-icon-path="${esc(iconPath)}"` : ''} style="--tile-bg:${tileColor(name)}" aria-hidden="true">${src ? iconImage(src) : esc(name[0]?.toUpperCase() || '?')}</span>
       <span class="names"><span class="name-line"><span class="nm">${esc(name)}</span>${status}</span>${sub}</span>
     </span>`;
   }
@@ -59,6 +103,7 @@
       const history = state.recent || [];
       const rows = visibleRows(history, q);
       const flagged = history.filter((p) => p.level !== 'calm').length;
+      updateThreatCount(flagged, history.some((p) => p.level === 'danger'));
       $('headline').textContent = flagged ? `${plural(flagged, 'process')} worth a look` : 'Process history';
       $('sub').textContent = history.length ? `${plural(history.length, 'process')} seen closing` : '';
       $('list').innerHTML = rows.length ? rows.map(recentRowHtml).join('')
@@ -71,6 +116,7 @@
     const visible = App.hasAppList ? visibleRows(all, q) : [];
     const danger = all.filter((p) => p.level === 'danger').length;
     const warn = all.filter((p) => p.level === 'warn').length;
+    updateThreatCount(danger + warn, danger > 0);
     $('headline').textContent = danger
       ? plural(danger, 'suspicious process')
       : warn ? `${plural(warn, 'process')} worth a look` : all.length ? 'All clear' : 'Scanning…';
@@ -95,20 +141,18 @@
     }
 
     const groups = [
-      { id: 'apps', title: 'Apps', items: visible.filter((p) => p.is_app) },
-      { id: 'background', title: 'Background processes', items: visible.filter((p) => !p.is_app) },
+      { id: 'attention', title: 'Needs attention', items: visible.filter((p) => p.level !== 'calm') },
+      { id: 'apps', title: 'Apps', items: visible.filter((p) => p.level === 'calm' && p.is_app) },
+      { id: 'background', title: 'Background processes', items: visible.filter((p) => p.level === 'calm' && !p.is_app) },
     ].filter((g) => g.items.length);
 
     $('list').innerHTML = groups.map((g) => {
       const open = !state.closed.has(g.id);
       let items = g.items;
       let more = '';
-      if (g.id === 'background' && !state.showAllCalm && !q) {
-        let calm = 0;
-        items = items.filter((p) => p.level !== 'calm' || ++calm <= CALM_LIMIT);
-        if (items.length < g.items.length) {
-          more = `<button class="more" data-more>Show all ${g.items.length} background processes</button>`;
-        }
+      if (g.id === 'background' && !state.showAllCalm && !q && items.length > CALM_LIMIT) {
+        more = `<button class="more" data-more>Show all ${items.length} background processes</button>`;
+        items = items.slice(0, CALM_LIMIT);
       }
       return `<section>
         <button class="group-h ${open ? 'open' : ''}" data-group="${g.id}" aria-expanded="${open}">
@@ -150,8 +194,18 @@
       return;
     }
     const name = displayName(p);
-    $('d-tile').textContent = name[0]?.toUpperCase() || '?';
-    $('d-tile').style.background = tileColor(name);
+    const tile = $('d-tile');
+    const iconPath = p.is_app ? p.path : null;
+    const src = appIcon(iconPath);
+    if (iconPath) tile.dataset.iconPath = iconPath;
+    else delete tile.dataset.iconPath;
+    tile.style.setProperty('--tile-bg', tileColor(name));
+    tile.classList.toggle('has-icon', !!src);
+    if (src) {
+      if (tile.firstElementChild?.getAttribute('src') !== src) tile.innerHTML = iconImage(src);
+    } else {
+      tile.textContent = name[0]?.toUpperCase() || '?';
+    }
     $('d-name').textContent = name;
     $('d-meta').textContent = `PID ${p.pid}${record ? ` · Seen closed ${exitTime.format(p.ended_at)}` : ''}${p.trusted ? ' · trusted by you' : ''}`;
     $('d-score').textContent = p.score;

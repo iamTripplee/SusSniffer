@@ -122,6 +122,8 @@ svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; 
 .seg { display: flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--field); }
 .seg button { font-size: 12px; font-weight: 500; padding: 4px 12px; border-radius: 6px; color: var(--text2); }
 .seg button.on { color: var(--text); background: var(--seg-on); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+.threat-count { display: inline-block; min-width: 18px; margin-left: 4px; padding: 0 4px; border-radius: 8px; color: var(--warn); background: var(--field); font-weight: 700; text-align: center; }
+.threat-count.high { color: var(--danger); background: var(--danger-row); }
 .search { display: flex; align-items: center; gap: 6px; width: 170px; min-width: 0; height: 28px; padding: 0 10px; border-radius: 8px; background: var(--field); color: var(--text2); }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 12px; color: var(--text); user-select: text; }
 .search svg { flex-shrink: 0; stroke-width: 2.4; }
@@ -150,14 +152,18 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 4px; }
 .group-h .chev { width: 10px; height: 10px; color: var(--text2); transition: transform .15s; }
 .group-h.open .chev { transform: rotate(90deg); }
 .group-h .t { font-size: 12px; font-weight: 600; }
+.group-h[data-group="attention"] .t { color: var(--warn); }
 .group-h .c { font-size: 12px; color: var(--text2); }
 
 .row { width: 100%; padding: 7px 12px; border-radius: 8px; text-align: left; }
 .row:hover { background: var(--hover); }
 .row.danger { background: var(--danger-row); }
 .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.tile { width: 28px; height: 28px; flex-shrink: 0; border-radius: 7px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.tile { width: 28px; height: 28px; flex-shrink: 0; border-radius: 7px; color: #fff; background: var(--tile-bg, transparent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
 .tile.big { width: 48px; height: 48px; border-radius: 12px; font-size: 20px; }
+.tile.has-icon { background: transparent; }
+.tile img { width: 24px; height: 24px; object-fit: contain; }
+.tile.big img { width: 40px; height: 40px; }
 .names { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .name-line { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .nm { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

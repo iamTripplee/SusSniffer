@@ -4,6 +4,7 @@ mod hw;
 mod ipc;
 mod rules;
 mod startup;
+mod app_icon;
 mod ui;
 mod updater;
 mod watcher;
