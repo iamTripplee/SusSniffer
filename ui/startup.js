@@ -41,7 +41,9 @@
 
   function render() {
     const q = state.query.trim().toLowerCase();
-    const items = state.items.filter((it) => !q || it.name.toLowerCase().includes(q) || (it.publisher || '').toLowerCase().includes(q));
+    const items = state.items
+      .filter((it) => !q || it.name.toLowerCase().includes(q) || (it.publisher || '').toLowerCase().includes(q))
+      .sort((a, b) => Number(b.enabled) - Number(a.enabled));
     const sus = state.items.filter((it) => it.level === 'danger').length;
     const newest = state.items.reduce((m, it) => Math.max(m, it.installed || 0), 0);
     $('st-head').textContent = `${plural(state.items.length, 'app')} start with Windows`;
