@@ -12,8 +12,11 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows::Win32::System::ProcessStatus::{K32GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
 use windows::Win32::System::Threading::{
-    GetProcessTimes, OpenProcess, QueryFullProcessImageNameW, TerminateProcess, PROCESS_NAME_WIN32,
-    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+    GetPriorityClass, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW, SetPriorityClass,
+    TerminateProcess, ABOVE_NORMAL_PRIORITY_CLASS, BELOW_NORMAL_PRIORITY_CLASS, HIGH_PRIORITY_CLASS,
+    IDLE_PRIORITY_CLASS, NORMAL_PRIORITY_CLASS, PROCESS_CREATION_FLAGS, PROCESS_NAME_WIN32,
+    PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_SET_INFORMATION, PROCESS_TERMINATE,
+    REALTIME_PRIORITY_CLASS,
 };
 use windows::Win32::UI::Shell::{
     SHQueryUserNotificationState, QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
@@ -95,6 +98,57 @@ pub fn kill(pid: u32) -> bool {
         Some(h) => unsafe { TerminateProcess(h.0, 1).is_ok() },
         None => false,
     }
+}
+
+const PRIORITIES: [(&str, PROCESS_CREATION_FLAGS); 5] = [
+    ("high", HIGH_PRIORITY_CLASS),
+    ("above", ABOVE_NORMAL_PRIORITY_CLASS),
+    ("normal", NORMAL_PRIORITY_CLASS),
+    ("below", BELOW_NORMAL_PRIORITY_CLASS),
+    ("low", IDLE_PRIORITY_CLASS),
+];
+
+pub fn process_controls(pid: u32) -> (Option<&'static str>, bool, bool) {
+    let priority = open(pid, PROCESS_QUERY_LIMITED_INFORMATION).and_then(|h| {
+        let class = unsafe { GetPriorityClass(h.0) };
+        if class == REALTIME_PRIORITY_CLASS.0 {
+            Some("realtime")
+        } else {
+            PRIORITIES.iter().find(|(_, value)| value.0 == class).map(|(name, _)| *name)
+        }
+    });
+    (
+        priority,
+        open(pid, PROCESS_SET_INFORMATION).is_some(),
+        open(pid, PROCESS_TERMINATE).is_some(),
+    )
+}
+
+pub fn set_priority(pid: u32, name: &str) -> Result<(), String> {
+    let (_, class) = PRIORITIES.iter().find(|(key, _)| *key == name).ok_or("Invalid priority")?;
+    let action = || {
+        let h = Handle(unsafe { OpenProcess(PROCESS_SET_INFORMATION, false, pid)? });
+        unsafe { SetPriorityClass(h.0, *class) }
+    };
+    action().map_err(|e| {
+        if e.code() == windows::core::HRESULT::from_win32(5) {
+            "Access denied. The process may be protected or require administrator rights.".into()
+        } else {
+            format!("Couldn't set priority: {e}")
+        }
+    })
+}
+
+pub fn reveal_path(path: &str) -> Result<(), String> {
+    let file = std::path::Path::new(path);
+    if !file.is_absolute() || !file.is_file() {
+        return Err("The file is missing or inaccessible.".into());
+    }
+    std::process::Command::new("explorer.exe")
+        .arg(format!("/select,{path}"))
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("Couldn't open File Explorer: {e}"))
 }
 
 /// Embedded Authenticode check. Revocation lookups are off to keep it offline and fast.

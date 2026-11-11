@@ -56,6 +56,11 @@ fn startup_set(id: String, enabled: bool) -> Result<(), String> {
     startup::set_enabled(&id, enabled)
 }
 
+#[tauri::command]
+async fn reveal_path(path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || win::reveal_path(&path)).await.map_err(|e| e.to_string())?
+}
+
 pub fn run(ctx: tauri::Context, port: u16, token: String) {
     let hw: Hw = Arc::default();
     {
@@ -68,7 +73,7 @@ pub fn run(ctx: tauri::Context, port: u16, token: String) {
     tauri::Builder::default()
         .manage(Conn { port, token })
         .manage(hw)
-        .invoke_handler(tauri::generate_handler![core, hardware, startup_list, startup_set])
+        .invoke_handler(tauri::generate_handler![core, hardware, startup_list, startup_set, reveal_path])
         .setup(|app| {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::App("index.html".into()))
                 .title("WinGlance")

@@ -111,6 +111,51 @@
     $('detail').hidden = true;
   }
 
+  function openDetail(p) {
+    state.detailPid = p.pid;
+    $('detail').hidden = false;
+    fillDetail();
+    if (!$('detail').hidden) $('d-close').focus();
+  }
+
+  async function processAction(cmd, p, failure) {
+    if (!p) return;
+    if (!(await core(cmd, p.pid))) throw new Error(failure);
+    if (cmd === 'kill' || cmd === 'trust') App.tick();
+  }
+
+  async function endTask(p) {
+    if (p && confirm(`End ${p.name}? Any unsaved work in it will be lost.`)) {
+      await processAction('kill', p, "Couldn't end the process. It may have exited, be protected, or require administrator rights.");
+    }
+  }
+
+  const priorityClasses = [
+    ['high', 'High'], ['above', 'Above normal'], ['normal', 'Normal'],
+    ['below', 'Below normal'], ['low', 'Low'],
+  ];
+
+  function processMenu(p, controls) {
+    const unavailable = controls ? 'This process may be protected or require administrator rights.' : 'Checking process permissions…';
+    const pathHint = p.path ? '' : 'The file path is unavailable.';
+    return [
+      { label: 'Open file location', disabled: !p.path, hint: pathHint, action: () => processAction('reveal', p, "Couldn't open the file location.") },
+      { label: 'End task…', danger: true, disabled: !controls?.can_end, hint: controls?.can_end ? '' : unavailable, action: () => endTask(p) },
+      {
+        label: 'Set priority', disabled: !controls?.can_set,
+        hint: !controls?.can_set ? unavailable : controls.current === 'realtime' ? 'Current priority: Realtime' : '',
+        items: priorityClasses.map(([key, label]) => ({
+          label, checked: controls?.current === key,
+          action: () => core('priority', p.pid, key),
+        })),
+      },
+      { label: 'Copy path', separator: true, disabled: !p.path, hint: pathHint, action: () => copyText(p.path) },
+      { label: 'Check on VirusTotal', disabled: !p.path, hint: pathHint, action: () => processAction('virustotal', p, "Couldn't open VirusTotal.") },
+      { label: 'Trust it', disabled: !p.path || p.trusted, hint: pathHint || (p.trusted ? 'Already trusted.' : ''), action: () => processAction('trust', p, "Couldn't trust the process.") },
+      { label: 'Details', action: () => openDetail(p) },
+    ];
+  }
+
   App.register('processes', {
     init() {
       $('list').addEventListener('click', (e) => {
@@ -124,10 +169,18 @@
           return render();
         }
         const row = e.target.closest('[data-pid]');
-        if (row) {
-          state.detailPid = Number(row.dataset.pid);
-          fillDetail();
-          $('detail').hidden = false;
+        const p = row && procs().find((x) => x.pid === Number(row.dataset.pid));
+        if (p) openDetail(p);
+      });
+      $('list').addEventListener('contextmenu', async (event) => {
+        const row = event.target.closest('[data-pid]');
+        const p = row && procs().find((x) => x.pid === Number(row.dataset.pid));
+        if (!p) return;
+        const update = ContextMenu.open(event, row, `[data-pid="${p.pid}"]`, processMenu(p));
+        try {
+          update(processMenu(p, await core('priority', p.pid)));
+        } catch (error) {
+          if (update(processMenu(p, {}))) reportActionError(error);
         }
       });
       document.querySelectorAll('#filter button').forEach((b) => b.addEventListener('click', () => {
@@ -147,18 +200,11 @@
       $('d-close').addEventListener('click', closeDetail);
       $('detail').addEventListener('click', (e) => { if (e.target === $('detail')) closeDetail(); });
       document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.detailPid != null) closeDetail(); });
-      $('a-kill').addEventListener('click', async () => {
-        const p = procs().find((x) => x.pid === state.detailPid);
-        if (!p || !confirm(`End ${p.name}? Any unsaved work in it will be lost.`)) return;
-        if (!(await core('kill', p.pid))) alert("Couldn't end the process. It may need admin rights.");
-        App.tick();
-      });
-      $('a-reveal').addEventListener('click', () => core('reveal', state.detailPid));
-      $('a-vt').addEventListener('click', () => core('virustotal', state.detailPid).catch((e) => alert(e.message)));
-      $('a-trust').addEventListener('click', async () => {
-        await core('trust', state.detailPid);
-        App.tick();
-      });
+      const current = () => procs().find((p) => p.pid === state.detailPid);
+      $('a-kill').addEventListener('click', () => runAction(() => endTask(current())));
+      $('a-reveal').addEventListener('click', () => runAction(() => processAction('reveal', current(), "Couldn't open the file location.")));
+      $('a-vt').addEventListener('click', () => runAction(() => processAction('virustotal', current(), "Couldn't open VirusTotal.")));
+      $('a-trust').addEventListener('click', () => runAction(() => processAction('trust', current(), "Couldn't trust the process.")));
     },
     enter: render,
     refresh() {

@@ -170,7 +170,7 @@ fn setup_autostart(app: &AppHandle, data_dir: &std::path::Path) -> bool {
     launcher.is_enabled().unwrap_or(false)
 }
 
-fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, pid: Option<u32>, _arg: Option<&str>) -> Value {
+fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, pid: Option<u32>, arg: Option<&str>) -> Value {
     let path = || pid.and_then(|p| shared.procs.lock().unwrap().get(&p).and_then(|x| x.path.clone()));
     match cmd {
         "snapshot" => {
@@ -181,6 +181,21 @@ fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, p
             json!({ "procs": procs, "totals": watcher::totals(shared), "focus": focus.swap(false, Ordering::Relaxed), "update": update })
         }
         "kill" => json!(pid.is_some_and(win::kill)),
+        "priority" => {
+            let Some(pid) = pid.filter(|pid| shared.procs.lock().unwrap().contains_key(pid)) else {
+                return json!({ "error": "The process is no longer listed." });
+            };
+            match arg {
+                Some(name) => match win::set_priority(pid, name) {
+                    Ok(()) => json!(true),
+                    Err(error) => json!({ "error": error }),
+                },
+                None => {
+                    let (current, can_set, can_end) = win::process_controls(pid);
+                    json!({ "current": current, "can_set": can_set, "can_end": can_end })
+                }
+            }
+        }
         "trust" => match path() {
             Some(p) => {
                 shared.trust(&p);
@@ -188,7 +203,10 @@ fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, p
             }
             None => json!(false),
         },
-        "reveal" => json!(path().is_some_and(|p| Command::new("explorer").arg(format!("/select,{p}")).spawn().is_ok())),
+        "reveal" => match path().ok_or_else(|| "The file path is unavailable.".to_string()).and_then(|p| win::reveal_path(&p)) {
+            Ok(()) => json!(true),
+            Err(error) => json!({ "error": error }),
+        },
         "virustotal" => match path().ok_or_else(|| "Can't resolve the file path".to_string()).and_then(|p| sha256_file(&p)) {
             Ok(hex) => match app.opener().open_url(format!("https://www.virustotal.com/gui/file/{hex}"), None::<&str>) {
                 Ok(()) => json!(true),

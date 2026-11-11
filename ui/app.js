@@ -55,6 +55,7 @@ const App = {
   },
 
   show(name) {
+    ContextMenu.close();
     this.current = name;
     document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('on', b.dataset.view === name));
     for (const v of Object.keys(this.views)) $(`view-${v}`).hidden = v !== name;

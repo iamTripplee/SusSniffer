@@ -25,7 +25,7 @@
     const fresh = it.installed && Date.now() / 1000 - it.installed < 7 * 86400;
     const publisher = it.publisher || (it.path ? 'Unknown' : 'File missing');
     const lock = it.all_users ? ' title="Changing all-user entries needs admin rights"' : '';
-    return `<div class="row st-grid ${it.level === 'danger' ? 'danger' : ''} ${it.enabled ? '' : 'off'}">
+    return `<div class="row st-grid ${it.level === 'danger' ? 'danger' : ''} ${it.enabled ? '' : 'off'}" data-startup-id="${esc(it.id)}" tabindex="-1">
       <span class="who">
         <span class="tile" style="background:${tileColor(it.name)}" aria-hidden="true">${esc(it.name[0]?.toUpperCase() || '?')}</span>
         <span class="names"><span class="nm">${esc(it.name)}</span>${sub}</span>
@@ -60,26 +60,47 @@
       console.error(e);
     }
     state.loading = false;
-    render();
+    if (App.current === 'startup') render();
+  }
+
+  const pending = new Set();
+
+  async function toggle(it) {
+    if (pending.has(it.id)) return;
+    const enabled = !it.enabled;
+    pending.add(it.id);
+    try {
+      await invoke('startup_set', { id: it.id, enabled });
+      const current = state.items.find((entry) => entry.id === it.id);
+      if (current) current.enabled = enabled;
+      if (App.current === 'startup') render();
+    } catch (err) {
+      if (String(err?.message ?? err) === 'Needs admin rights') {
+        throw new Error(`Run WinGlance as administrator to change the startup setting for ${it.name}.`);
+      }
+      throw err;
+    } finally {
+      pending.delete(it.id);
+    }
   }
 
   App.register('startup', {
     init() {
-      $('st-list').addEventListener('click', async (e) => {
+      $('st-list').addEventListener('click', (e) => {
         const sw = e.target.closest('.switch');
         if (!sw) return;
         const it = state.items.find((x) => x.id === sw.dataset.id);
+        if (it) runAction(() => toggle(it));
+      });
+      $('st-list').addEventListener('contextmenu', (event) => {
+        const row = event.target.closest('[data-startup-id]');
+        const it = row && state.items.find((entry) => entry.id === row.dataset.startupId);
         if (!it) return;
-        try {
-          await invoke('startup_set', { id: it.id, enabled: !it.enabled });
-          it.enabled = !it.enabled;
-          render();
-        } catch (err) {
-          const msg = String(err?.message ?? err);
-          alert(msg === 'Needs admin rights'
-            ? `${it.name} is set up for all users. Turning it off needs WinGlance to run as administrator.`
-            : msg);
-        }
+        ContextMenu.open(event, row, `[data-startup-id="${CSS.escape(it.id)}"]`, [
+          { label: 'Open file location', disabled: !it.path, hint: it.path ? '' : 'The file path is unavailable.', action: () => invoke('reveal_path', { path: it.path }) },
+          { label: it.enabled ? 'Disable' : 'Enable', disabled: pending.has(it.id), hint: it.all_users ? 'Changing all-user entries may require administrator rights.' : '', action: () => toggle(it) },
+          { label: 'Copy command', disabled: !it.command, action: () => copyText(it.command) },
+        ]);
       });
     },
     enter: load,
