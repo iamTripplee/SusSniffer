@@ -2,10 +2,10 @@
 //! only analyses processes it hasn't seen yet. Per-process CPU and memory are
 //! sampled only while the window is open.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 
@@ -13,6 +13,7 @@ use crate::rules::{self, ProcFacts, Verdict};
 use crate::win;
 
 const TICK: Duration = Duration::from_secs(2);
+const RECENT_LIMIT: usize = 200;
 pub const ALERT_SCORE: u32 = 60;
 
 #[derive(Clone, Serialize)]
@@ -40,8 +41,17 @@ pub struct Totals {
     pub self_mem: u64,
 }
 
+#[derive(Clone, Serialize)]
+pub struct RecentProcess {
+    pub id: u64,
+    pub ended_at: u64,
+    #[serde(flatten)]
+    process: Proc,
+}
+
 pub struct Shared {
     pub procs: Mutex<HashMap<u32, Proc>>,
+    recent: Mutex<VecDeque<RecentProcess>>,
     pub trusted: Mutex<HashSet<String>>,
     /// Last time the window polled us.
     pub ui_seen: Mutex<Option<Instant>>,
@@ -58,11 +68,34 @@ impl Shared {
             .unwrap_or_default();
         Arc::new(Self {
             procs: Mutex::new(HashMap::new()),
+            recent: Mutex::new(VecDeque::new()),
             trusted: Mutex::new(trusted),
             ui_seen: Mutex::new(None),
             self_usage: Mutex::new((0.0, 0)),
             trusted_file,
         })
+    }
+
+    pub fn recent(&self, revision: Option<u64>) -> Option<Vec<RecentProcess>> {
+        let recent = self.recent.lock().unwrap();
+        let latest = recent.back().map_or(0, |entry| entry.id);
+        (revision != Some(latest)).then(|| recent.iter().rev().cloned().collect())
+    }
+
+    fn remember_exits(&self, exited: impl Iterator<Item = Proc>) {
+        let mut exited = exited.peekable();
+        if exited.peek().is_none() {
+            return;
+        }
+        let ended_at = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as u64;
+        let mut recent = self.recent.lock().unwrap();
+        for process in exited {
+            let id = recent.back().map_or(1, |entry| entry.id + 1);
+            if recent.len() == RECENT_LIMIT {
+                recent.pop_front();
+            }
+            recent.push_back(RecentProcess { id, ended_at, process });
+        }
     }
 
     pub fn trust(&self, path: &str) {
@@ -96,12 +129,16 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
     let mut sig_cache: HashMap<String, bool> = HashMap::new();
     let mut pending: Vec<u32> = Vec::new();
     let mut last_sample = Instant::now();
+    let mut sampled_procs = false;
     let cpus = win::cpu_count();
     let me = std::process::id();
     let mut self_ticks = 0u64;
 
     loop {
-        let raw = win::list_processes();
+        let Some(raw) = win::list_processes() else {
+            std::thread::sleep(TICK);
+            continue;
+        };
         let names: HashMap<u32, &str> = raw.iter().map(|r| (r.pid, r.name.as_str())).collect();
         let trusted = shared.trusted.lock().unwrap().clone();
 
@@ -156,8 +193,9 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
 
         {
             let mut procs = shared.procs.lock().unwrap();
-            let alive: HashSet<u32> = raw.iter().map(|r| r.pid).collect();
-            procs.retain(|pid, _| alive.contains(pid));
+            shared.remember_exits(procs.extract_if(|pid, p| {
+                names.get(pid).is_none_or(|name| *name != p.name)
+            }).map(|(_, process)| process));
             for p in analysed {
                 if p.score >= ALERT_SCORE {
                     pending.push(p.pid);
@@ -171,14 +209,17 @@ fn run(shared: Arc<Shared>, alert: impl Fn(Vec<Proc>)) {
             if ui_open {
                 for p in procs.values_mut() {
                     if let Some((ticks, mem)) = win::usage(p.pid) {
-                        if p.cpu_ticks > 0 && elapsed > 0 {
+                        if sampled_procs && p.cpu_ticks > 0 && elapsed > 0 {
                             p.cpu = (ticks.saturating_sub(p.cpu_ticks)) as f32 / (elapsed * cpus) as f32 * 100.0;
+                        } else {
+                            p.cpu = 0.0;
                         }
                         p.cpu_ticks = ticks;
                         p.mem = mem;
                     }
                 }
             }
+            sampled_procs = ui_open;
             if let Some((ticks, mem)) = win::usage(me) {
                 let cpu = if self_ticks > 0 && elapsed > 0 {
                     ticks.saturating_sub(self_ticks) as f32 / (elapsed * cpus) as f32 * 100.0
@@ -211,4 +252,46 @@ pub fn totals(shared: &Shared) -> Totals {
     let count = shared.procs.lock().unwrap().len();
     let (self_cpu, self_mem) = *shared.self_usage.lock().unwrap();
     Totals { count, self_cpu, self_mem }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn history_preserves_risk_and_distinguishes_reused_pids() {
+        let shared = Shared::new(std::env::temp_dir().join("winglance-history-test"));
+        let process = Proc {
+            pid: 42,
+            ppid: 7,
+            name: "example.exe".into(),
+            path: None,
+            parent_name: None,
+            signed: None,
+            trusted: false,
+            score: 65,
+            level: "danger",
+            reasons: vec![rules::Reason { pts: 65, title: "Example rule".into(), text: "Recorded reason".into() }],
+            cpu: 0.0,
+            mem: 0,
+            cpu_ticks: 0,
+        };
+        shared.remember_exits((0..=RECENT_LIMIT).map(|_| process.clone()));
+        let rows = shared.recent(None).unwrap();
+        assert_eq!(rows.len(), RECENT_LIMIT);
+        assert_eq!(rows.last().unwrap().id, 2);
+        let newest = &rows[0];
+        assert!(newest.id > rows[1].id);
+        assert!(newest.ended_at > 0);
+        assert_eq!(newest.process.pid, rows[1].process.pid);
+        assert_eq!(newest.process.score, 65);
+        assert_eq!(newest.process.reasons[0].text, "Recorded reason");
+        assert!(shared.recent(Some(newest.id)).is_none());
+    }
+
+    #[test]
+    fn process_snapshot_includes_this_process() {
+        let processes = win::list_processes().expect("complete process snapshot");
+        assert!(processes.iter().any(|p| p.pid == std::process::id()));
+    }
 }

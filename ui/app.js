@@ -49,6 +49,7 @@ const App = {
   views: {},
   current: 'processes',
   procs: [],
+  hasAppList: false,
 
   register(name, view) {
     this.views[name] = view;
@@ -68,8 +69,12 @@ const App = {
 
   async tick() {
     try {
-      const snap = await core('snapshot');
-      this.procs = snap.procs;
+      const arg = this.views[this.current].snapshotArg?.();
+      const snap = await core('snapshot', null, arg);
+      if (arg === this.views[this.current].snapshotArg?.()) {
+        this.procs = snap.procs;
+        this.hasAppList = arg === 'apps';
+      }
       const t = snap.totals;
       $('self').textContent = `WinGlance core: ${fmtCpu(t.self_cpu)} CPU · ${fmtBytes(t.self_mem)}`;
       this.renderUpdate(snap.update);
@@ -101,7 +106,10 @@ const App = {
   },
 
   start() {
-    document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => this.show(b.dataset.view)));
+    document.querySelectorAll('#nav button').forEach((b) => b.addEventListener('click', () => {
+      this.show(b.dataset.view);
+      if (b.dataset.view === 'processes') this.tick();
+    }));
     $('q').addEventListener('input', (e) => this.views[this.current].search?.(e.target.value));
     $('update').addEventListener('click', () => core('update').then(() => this.tick()));
     $('min').addEventListener('click', () => appWindow.minimize());

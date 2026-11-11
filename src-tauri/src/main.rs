@@ -174,12 +174,18 @@ fn handle_cmd(shared: &Shared, app: &AppHandle, focus: &AtomicBool, cmd: &str, p
     let path = || pid.and_then(|p| shared.procs.lock().unwrap().get(&p).and_then(|x| x.path.clone()));
     match cmd {
         "snapshot" => {
-            *shared.ui_seen.lock().unwrap() = Some(Instant::now());
-            let mut procs: Vec<Proc> = shared.procs.lock().unwrap().values().cloned().collect();
+            let show_recent = arg == Some("recent");
+            *shared.ui_seen.lock().unwrap() = (!show_recent).then(Instant::now);
+            let mut procs: Vec<Proc> = if show_recent {
+                Vec::new()
+            } else {
+                shared.procs.lock().unwrap().values().cloned().collect()
+            };
             procs.sort_by(|a, b| b.score.cmp(&a.score).then(b.cpu.total_cmp(&a.cpu)));
             let update = app.try_state::<updater::Updates>().map(|u| u.status());
             json!({ "procs": procs, "totals": watcher::totals(shared), "focus": focus.swap(false, Ordering::Relaxed), "update": update })
         }
+        "recent" => json!(shared.recent(arg.and_then(|value| value.parse().ok()))),
         "kill" => json!(pid.is_some_and(win::kill)),
         "priority" => {
             let Some(pid) = pid.filter(|pid| shared.procs.lock().unwrap().contains_key(pid)) else {

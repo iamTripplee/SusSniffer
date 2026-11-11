@@ -38,18 +38,27 @@
     <div class="head">
       <h1 id="headline">Scanning…</h1>
       <div id="sub" class="muted"></div>
+    </div>
+    <div class="process-tools">
+      <div class="seg" id="process-mode" aria-label="Process status">
+        <button class="on" data-mode="running" aria-pressed="true">Running</button>
+        <button data-mode="recent" aria-pressed="false">Recently closed</button>
+      </div>
       <span class="spacer"></span>
       <button id="sort-pill" class="pill" hidden></button>
-      <div class="seg" id="filter">
-        <button class="on" data-tab="all">All</button>
-        <button data-tab="threats">Threats</button>
+      <div class="seg" id="filter" aria-label="Risk filter">
+        <button class="on" data-tab="all" aria-pressed="true">All</button>
+        <button data-tab="threats" aria-pressed="false">Threats</button>
       </div>
     </div>
-    <div class="cols row-grid">
+    <div class="cols row-grid" id="running-cols">
       <div>Process</div>
       <button class="col r" data-sort="cpu">CPU<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
       <button class="col r" data-sort="mem">Memory<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
       <button class="col" data-sort="risk">Risk<svg viewBox="0 0 8 8" aria-hidden="true"><path d="M1.5 2.5L4 5.5l2.5-3"/></svg></button>
+    </div>
+    <div class="cols recent-grid" id="recent-cols" hidden>
+      <div>Process</div><div class="r">Seen closed</div><div>Risk</div>
     </div>
     <main id="list"></main>
   </section>
@@ -97,11 +106,12 @@
       <div id="d-why-label" class="label">Why it looks suspicious</div>
       <div id="d-reasons" class="reasons"></div>
       <dl class="facts">
+        <dt>File name</dt><dd id="d-file" class="mono"></dd>
         <dt>Path</dt><dd id="d-path" class="mono"></dd>
         <dt>Parent</dt><dd id="d-parent"></dd>
         <dt>Signature</dt><dd id="d-sign"></dd>
       </dl>
-      <div class="actions">
+      <div class="actions" id="d-actions">
         <button id="a-kill" class="btn danger">End process</button>
         <button id="a-reveal" class="btn">Show in folder</button>
         <button id="a-vt" class="btn">Check on VirusTotal</button>

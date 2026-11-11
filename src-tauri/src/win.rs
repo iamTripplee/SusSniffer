@@ -1,7 +1,7 @@
 use std::mem::size_of;
 
 use windows::core::{GUID, PCWSTR, PWSTR};
-use windows::Win32::Foundation::{CloseHandle, FILETIME, HANDLE, HWND};
+use windows::Win32::Foundation::{CloseHandle, ERROR_NO_MORE_FILES, FILETIME, HANDLE, HWND};
 use windows::Win32::Security::WinTrust::{
     WinVerifyTrust, WINTRUST_ACTION_GENERIC_VERIFY_V2, WINTRUST_DATA, WINTRUST_DATA_0,
     WINTRUST_FILE_INFO, WTD_CACHE_ONLY_URL_RETRIEVAL, WTD_CHOICE_FILE, WTD_REVOKE_NONE,
@@ -28,29 +28,24 @@ pub struct RawProc {
     pub name: String,
 }
 
-pub fn list_processes() -> Vec<RawProc> {
+pub fn list_processes() -> Option<Vec<RawProc>> {
     let mut out = Vec::with_capacity(400);
     unsafe {
-        let Ok(snap) = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) else {
-            return out;
-        };
+        let snap = Handle(CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()?);
         let mut e = PROCESSENTRY32W { dwSize: size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
-        if Process32FirstW(snap, &mut e).is_ok() {
-            loop {
-                let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
-                out.push(RawProc {
-                    pid: e.th32ProcessID,
-                    ppid: e.th32ParentProcessID,
-                    name: String::from_utf16_lossy(&e.szExeFile[..len]),
-                });
-                if Process32NextW(snap, &mut e).is_err() {
-                    break;
-                }
+        Process32FirstW(snap.0, &mut e).ok()?;
+        loop {
+            let len = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
+            out.push(RawProc {
+                pid: e.th32ProcessID,
+                ppid: e.th32ParentProcessID,
+                name: String::from_utf16_lossy(&e.szExeFile[..len]),
+            });
+            if let Err(err) = Process32NextW(snap.0, &mut e) {
+                return (err.code() == ERROR_NO_MORE_FILES.to_hresult()).then_some(out);
             }
         }
-        let _ = CloseHandle(snap);
     }
-    out
 }
 
 struct Handle(HANDLE);
@@ -231,6 +226,14 @@ pub fn expand_env(s: &str) -> String {
 
 /// CompanyName from the file's version resource.
 pub fn file_company(path: &str) -> Option<String> {
+    file_version_string(path, "CompanyName")
+}
+
+pub fn file_description(path: &str) -> Option<String> {
+    file_version_string(path, "FileDescription")
+}
+
+fn file_version_string(path: &str, field: &str) -> Option<String> {
     use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
     let w = wide(path);
     unsafe {
@@ -245,12 +248,12 @@ pub fn file_company(path: &str) -> Option<String> {
         let mut len = 0u32;
         let q = wide(r"\VarFileInfo\Translation");
         let langs: Vec<(u16, u16)> = if VerQueryValueW(data.as_ptr().cast(), PCWSTR(q.as_ptr()), &mut ptr, &mut len).as_bool() && len >= 4 {
-            std::slice::from_raw_parts(ptr as *const u16, len as usize / 2).chunks(2).map(|c| (c[0], c[1])).collect()
+            std::slice::from_raw_parts(ptr as *const u16, len as usize / 2).chunks_exact(2).map(|c| (c[0], c[1])).collect()
         } else {
             vec![(0x0409, 0x04b0)]
         };
         for (lang, cp) in langs {
-            let q = wide(&format!(r"\StringFileInfo\{lang:04x}{cp:04x}\CompanyName"));
+            let q = wide(&format!(r"\StringFileInfo\{lang:04x}{cp:04x}\{field}"));
             if VerQueryValueW(data.as_ptr().cast(), PCWSTR(q.as_ptr()), &mut ptr, &mut len).as_bool() && len > 1 {
                 let s = from_wide(std::slice::from_raw_parts(ptr as *const u16, len as usize)).trim().to_string();
                 if !s.is_empty() {
