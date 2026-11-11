@@ -1,7 +1,8 @@
 (() => {
   const CALM_LIMIT = 40;
+  const sortLabels = { cpu: 'CPU', mem: 'Memory', risk: 'Risk' };
   const state = {
-    mode: 'running', tab: 'all', query: '', sort: 'risk', closed: new Set(),
+    mode: 'running', tab: 'all', query: '', sort: 'risk', ascending: false, closed: new Set(),
     showAllCalm: false, detail: null, recent: null, recentPending: false, recentError: false,
   };
   const procs = () => App.procs;
@@ -98,7 +99,7 @@
     const recent = state.mode === 'recent';
     $('running-cols').hidden = recent;
     $('recent-cols').hidden = !recent;
-    $('sort-pill').hidden = recent || state.sort === 'risk';
+    $('sort-pill').hidden = recent || (state.sort === 'risk' && !state.ascending);
     if (recent) {
       const history = state.recent || [];
       const rows = visibleRows(history, q);
@@ -122,8 +123,15 @@
       : warn ? `${plural(warn, 'process')} worth a look` : all.length ? 'All clear' : 'Scanning…';
     $('sub').textContent = `Watching ${plural(all.length, 'process')}`;
 
-    document.querySelectorAll('.cols [data-sort]').forEach((b) => b.classList.toggle('on', b.dataset.sort === state.sort));
-    $('sort-pill').innerHTML = `Sort by ${state.sort === 'cpu' ? 'CPU' : 'memory'} <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>`;
+    for (const button of $('running-cols').querySelectorAll('[data-sort]')) {
+      const active = button.dataset.sort === state.sort;
+      const label = sortLabels[button.dataset.sort];
+      const direction = state.ascending ? 'ascending' : 'descending';
+      button.classList.toggle('on', active);
+      button.classList.toggle('ascending', active && state.ascending);
+      button.setAttribute('aria-label', active ? `${label}, sorted ${direction}. Reverse sort order` : `Sort by ${label}`);
+    }
+    $('sort-pill').innerHTML = `Sort by ${sortLabels[state.sort]} <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>`;
 
     if (!visible.length) {
       $('list').innerHTML = !App.hasAppList ? '<div class="empty">Waiting for process data…</div>'
@@ -131,14 +139,11 @@
       return;
     }
 
-    let maxCpu = 0;
-    let maxMem = 0;
-    if (state.sort !== 'risk') {
-      const key = state.sort;
-      visible.sort((a, b) => b[key] - a[key]);
-      maxCpu = visible.reduce((max, p) => Math.max(max, p.cpu), 0);
-      maxMem = visible.reduce((max, p) => Math.max(max, p.mem), 0);
-    }
+    const key = state.sort === 'risk' ? 'score' : state.sort;
+    const direction = state.ascending ? 1 : -1;
+    visible.sort((a, b) => direction * (a[key] - b[key]));
+    const maxCpu = key === 'cpu' ? visible.reduce((max, p) => Math.max(max, p.cpu), 0) : 0;
+    const maxMem = key === 'mem' ? visible.reduce((max, p) => Math.max(max, p.mem), 0) : 0;
 
     const groups = [
       { id: 'attention', title: 'Needs attention', items: visible.filter((p) => p.level !== 'calm') },
@@ -344,12 +349,14 @@
         if (state.mode === 'recent') refreshRecent();
         else App.tick();
       }));
-      document.querySelectorAll('.cols [data-sort]').forEach((b) => b.addEventListener('click', () => {
+      $('running-cols').querySelectorAll('[data-sort]').forEach((b) => b.addEventListener('click', () => {
+        state.ascending = state.sort === b.dataset.sort && !state.ascending;
         state.sort = b.dataset.sort;
         render();
       }));
       $('sort-pill').addEventListener('click', () => {
         state.sort = 'risk';
+        state.ascending = false;
         render();
       });
 

@@ -22,6 +22,15 @@
       <line x1="0" y1="${h - 0.5}" x2="380" y2="${h - 0.5}" style="stroke:var(--axis)" stroke-width="1" vector-effect="non-scaling-stroke"/>${inner}</svg>`;
   }
 
+  function networkStats(label, color, history) {
+    const average = history.length ? fmtRate(history.reduce((sum, rate) => sum + rate, 0) / history.length) : '—';
+    const peak = history.length ? fmtRate(Math.max(...history)) : '—';
+    return `<tr>
+      <th scope="row"><span class="key"><i style="background:var(${color})"></i>${label}</span></th>
+      <td class="num">${average}</td><td class="num">${peak}</td>
+    </tr>`;
+  }
+
   function gaugeCard(label, model, value, extra, hist, footer) {
     return `<section class="card">
       <div class="card-h"><h2>${label}</h2><span class="model">${esc(model)}</span></div>
@@ -101,11 +110,18 @@
     ];
 
     const disks = d.disks.map((k) => {
-      const used = k.total - k.free;
+      const drive = esc(k.root.replace('\\', ''));
+      const free = Math.min(k.free, k.total);
+      const used = k.total - free;
+      const percent = k.total ? (used / k.total) * 100 : 0;
+      const usedLabel = used ? fmtBytes(used) : '0 B';
+      const freeLabel = free ? fmtBytes(free) : '0 B';
       return `<div class="disk">
-        <div class="disk-h"><b>${esc(k.root.replace('\\', ''))}</b><span class="dim">${esc(k.label || 'Local disk')}</span><span class="spacer"></span><span class="num">${fmtBytes(used)} of ${fmtBytes(k.total)}</span></div>
-        <span class="meter wide tall"><i style="width:${(used / k.total) * 100}%"></i></span>
-        <div class="dim small">${fmtBytes(k.free)} free</div>
+        <div class="disk-h"><b>${drive}</b><span class="dim disk-label">${esc(k.label || 'Local disk')}</span><span class="spacer"></span>${k.total ? `<span class="num disk-size">${usedLabel} of ${fmtBytes(k.total)}</span>` : ''}</div>
+        ${k.total ? `
+          <span class="meter tall" role="meter" aria-label="${drive} disk space used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percent}"><i style="width:${percent}%"></i></span>
+          <div class="disk-meta dim small num"><span>${freeLabel} free</span><span>${Math.round(percent)}% used</span></div>
+        ` : '<div class="dim small">Capacity unavailable</div>'}
       </div>`;
     }).join('');
 
@@ -116,7 +132,13 @@
         <span class="key"><i style="background:var(--c2)"></i>Up <b class="num">${fmtRate(live.net_up)}</b></span>
       </div>
       ${sparkSvg(spark(live.down_hist, netMax, '--c1', 70, false) + spark(live.up_hist, netMax, '--c2', 70, false), 70, 'Download and upload over the last 60 seconds')}
-      <div class="dim small">Peak in view: ${fmtRate(netMax)}</div>
+      <table class="network-stats" aria-label="Network speeds in the visible graph">
+        <thead><tr><th scope="col">In view</th><th scope="col">Average</th><th scope="col">Peak</th></tr></thead>
+        <tbody>
+          ${networkStats('Download', '--c1', live.down_hist)}
+          ${networkStats('Upload', '--c2', live.up_hist)}
+        </tbody>
+      </table>
     </section>`;
 
     $('hw').innerHTML = cpu + gpu

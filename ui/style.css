@@ -227,6 +227,7 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 4px; }
 .cols .col:hover { color: var(--text2); }
 .cols .col.on { color: var(--text); }
 .cols .col.on svg { opacity: 1; }
+.cols .col.ascending svg { transform: rotate(180deg); }
 
 .cell.r { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .meter { display: block; width: 60px; height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
@@ -247,6 +248,11 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 4px; }
 .card-h { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .card-h h2 { margin: 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text3); }
 .card-h .model { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.network-stats { width: 100%; border-collapse: collapse; font-size: 12px; }
+.network-stats th, .network-stats td { padding: 4px 0 4px 8px; text-align: right; white-space: nowrap; }
+.network-stats th:first-child { padding-left: 0; text-align: left; }
+.network-stats thead th { color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--sep); }
+.network-stats tbody th { color: var(--text2); font-weight: 400; }
 .big { display: flex; align-items: baseline; gap: 10px; }
 .big span { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; line-height: 1; }
 .big small { font-size: 12px; color: var(--text2); }
@@ -269,6 +275,10 @@ main::-webkit-scrollbar-thumb { background: var(--track); border-radius: 4px; }
 .disk { display: flex; flex-direction: column; gap: 6px; }
 .disk-h { display: flex; align-items: baseline; gap: 8px; font-size: 12px; }
 .disk-h b { font-size: 13px; }
+.disk-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.disk-size { flex-shrink: 0; }
+.disk > .meter { width: 100%; }
+.disk-meta { display: flex; justify-content: space-between; gap: 8px; }
 .io { margin-top: auto; }
 .key { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .key i { width: 10px; height: 2px; border-radius: 1px; }
